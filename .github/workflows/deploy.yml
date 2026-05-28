@@ -1,0 +1,53 @@
+name: Deploy ResumeIQ
+
+on:
+    push:
+        branches:
+            - main
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+
+        steps:
+              - name: Checkout code
+                uses: actions/checkout@v3
+              - name: Set up Python
+                uses: actions/setup-python@v4
+                with:
+                    python-version: '3.11'
+            
+              - name: Install dependencies into package/
+                run: |
+                    pip install \
+                        --platform manylinux2014_x86_64 \
+                        --target package/ \
+                        --implementation cp \
+                        --python-version 3.11 \
+                        --only-binary=:all: \
+                        fastapi uvicorn openai pypdf python-multipart mangum
+                
+              - name: Zip app and dependencies
+                run: |
+                    cd package
+                    zip -r ../lambda.zip .
+                    cd ../app
+                    zip -r ../lambda.zip .
+              
+              - name: Configure AWS credentials
+                uses: aws-actions/configure-aws-credentials@v2
+                with:
+                    aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                    aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                    aws-region: us-west-1
+
+              - name: Upload zip to S3
+                run: |
+                    aws s3 cp lambda.zip s3://resumeiq-bucket-prachi/lambda.zip
+            
+              - name: Deploy to Lambda
+                run: |
+                    aws lambda update-function-code \
+                        --function-name resumeiq-analyzer \
+                        --s3-bucket resumeiq-bucket-prachi \
+                        --s3-key lambda.zip

@@ -20,3 +20,6 @@ app/dependencies/
 
 # Lambda zip
 infra/lambda.zip
+
+# Build artifacts
+package/
